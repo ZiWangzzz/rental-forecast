@@ -5,52 +5,248 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
+        body { font-family: Arial, sans-serif; background-color: #f9f9f9; margin: 0; padding: 0 }
         .container { max-width: 1200px; margin: 0 auto; padding: 20px }
-        .input-section { background: #f5f5f5; padding: 20px; border-radius: 8px }
+        .input-section { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) }
         .chart-container { margin-top: 30px }
-        .contract-item { margin-bottom: 15px; padding: 10px; border: 1px solid #ddd }
-        input { width: 150px; margin-right: 10px }
-        button { background: #4CAF50; color: white; border: none; padding: 8px 15px }
+        .contract-item { margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; background: #fafafa }
+        .contract-row { display: flex; flex-wrap: wrap; justify-content: flex-start; margin-bottom: 10px; gap: 15px }
+        .contract-row label { width: 120px; margin-right: 3px; text-align: left }
+        .contract-row input, .discount-fields input { width: 120px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; height: 20px }
+        .contract-item button { background: #ff4d4d; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer }
+        .discount-fields { margin-top: 10px; display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 15px }
+        .discount-fields label { width: 100px; text-align: left }
+        button { background: #4CAF50; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer }
+        .download-btn { background: #007BFF; margin-left: 10px }
+        .visitor-count { font-size: 14px; color: #555; margin-top: 10px }
+        .data-table { margin-top: 20px; width: 100%; border-collapse: collapse }
+        .data-table th, .data-table td { padding: 10px; border: 1px solid #ddd; text-align: center }
+        .data-table th { background: #f5f5f5 }
     </style>
 </head>
 <body>
     <div class="container">
+        <h1>泊寓项目筹开期经营收入速算工具v1.0</h1>
+        <p>开发人：王梓 <a href="mailto:wangz147@vanke.com">wangz147@vanke.com</a> 13916664164</p>
+
         <div class="input-section">
-            <h2>租赁合同输入</h2>
+            <h2>项目信息</h2>
+            <div class="contract-row">
+                <label>项目名称:</label><input type="text" id="project-name">
+                <label>所在城市:</label><input type="text" id="city">
+                <label>项目体量（间）:</label><input type="number" id="project-size" min="1">
+            </div>
+        </div>
+
+        <div class="input-section">
+            <h2>分批开业计划</h2>
             <div id="contracts">
-                <div class="contract-item">
-                    起租日期: <input type="date" class="start-date">
-                    客户数: <input type="number" class="quantity" min="1" value="1">
-                    租期(月): <input type="number" class="term" min="1" value="12">
-                    月租金: <input type="number" class="rent" min="0" value="3000">
-                    <button onclick="removeContract(this)">删除</button>
-                </div>
+                <!-- 默认不显示任何内容 -->
             </div>
             <button onclick="addContract()">添加合同</button>
             <button onclick="calculate()">开始计算</button>
         </div>
 
         <div class="chart-container">
-            <canvas id="expirationChart"></canvas>
+            <h2>出租率爬坡图</h2>
+            <canvas id="occupancyChart"></canvas>
+            <h2>合同到期月份</h2>
+            <canvas id="leaseChart"></canvas>
+            <h2>收入分布示意图</h2>
+            <canvas id="incomeChart"></canvas>
         </div>
+
+        <div class="chart-container">
+            <h2>数据表</h2>
+            <table class="data-table" id="data-table">
+                <thead>
+                    <tr>
+                        <th>月份</th>
+                        <th>出租率 (%)</th>
+                        <th>到期合同数量</th>
+                        <th>房租收入 (元)</th>
+                        <th>管理费收入 (元)</th>
+                        <th>总收入 (元)</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div class="visitor-count">访问量: <span id="visitor-count">0</span></div>
+        <button class="download-btn" onclick="downloadData()">下载所有信息 (CSV)</button>
     </div>
 
 <script>
-let chart = null;
+let charts = {
+    occupancy: null,
+    lease: null,
+    income: null
+};
+let visitorCount = localStorage.getItem('visitorCount') || 0;
+visitorCount++;
+localStorage.setItem('visitorCount', visitorCount);
+document.getElementById('visitor-count').textContent = visitorCount;
 
 function addContract() {
     const newContract = $(`<div class="contract-item">
-        起租日期: <input type="date" class="start-date">
-        客户数: <input type="number" class="quantity" min="1" value="1">
-        租期(月): <input type="number" class="term" min="1" value="12">
-        月租金: <input type="number" class="rent" min="0" value="3000">
+        <div class="contract-row">
+            <label>起租日期:</label><input type="date" class="start-date" value="2025-01-01">
+            <label>合同数量:</label><input type="number" class="quantity" min="1" value="100">
+            <label>租期(月):</label><input type="number" class="term" min="1" value="12">
+            <label>月租金:</label><input type="number" class="rent" min="0" value="3000">
+            <label>月管理费:</label><input type="number" class="management-fee" min="0" value="200">
+        </div>
+        <div class="discount-fields"></div>
         <button onclick="removeContract(this)">删除</button>
     </div>`);
     $('#contracts').append(newContract);
+    updateDiscountFields(newContract.find('.term')[0]);
+    newContract.find('.term').change(function() {
+        updateDiscountFields(this);
+    });
 }
 
 function removeContract(button) {
     $(button).parent().remove();
+}
+
+function updateDiscountFields(input) {
+    const term = parseInt($(input).val());
+    const fields = $(input).closest('.contract-item').find('.discount-fields');
+    fields.empty();
+    for (let i = 1; i <= term; i++) {
+        const label = `<label>第${i}月折扣率:</label>`;
+        const inputField = `<input type="number" class="month-discount" min="0" max="1" step="0.01" value="1">`;
+        fields.append(label + inputField);
+    }
+}
+
+function calculate() {
+    const projectSize = parseInt($('#project-size').val()) || 1;
+    const contracts = [];
+    $('.contract-item').each(function() {
+        const contract = {
+            startDate: $(this).find('.start-date').val(),
+            quantity: parseInt($(this).find('.quantity').val()),
+            term: parseInt($(this).find('.term').val()),
+            rent: parseFloat($(this).find('.rent').val()),
+            managementFee: parseFloat($(this).find('.management-fee').val()),
+            discounts: []
+        };
+        $(this).find('.month-discount').each(function() {
+            contract.discounts.push(parseFloat($(this).val()));
+        });
+        if (contract.startDate) contracts.push(contract);
+    });
+
+    const results = {};
+    const expirationResults = {};
+    contracts.forEach(contract => {
+        const start = parseDate(contract.startDate);
+        for (let i = 0; i < contract.term; i++) {
+            const month = (start.month + i - 1) % 12 + 1;
+            const year = start.year + Math.floor((start.month + i - 1) / 12);
+            const key = `${year}-${String(month).padStart(2, '0')}`;
+            results[key] = results[key] || { count: 0, rentRevenue: 0, managementRevenue: 0 };
+            results[key].count += contract.quantity;
+            const discount = contract.discounts[i] || 1;
+            const daysInMonth = new Date(year, month, 0).getDate();
+            const startDay = (i === 0) ? new Date(contract.startDate).getDate() : 1;
+            const days = daysInMonth - startDay + 1;
+            const rentRevenue = contract.quantity * (contract.rent * (days / daysInMonth) * discount);
+            const managementRevenue = contract.quantity * contract.managementFee;
+            results[key].rentRevenue += rentRevenue;
+            results[key].managementRevenue += managementRevenue;
+
+            if (i === contract.term - 1) {
+                const expirationKey = `${year}-${String(month).padStart(2, '0')}`;
+                expirationResults[expirationKey] = (expirationResults[expirationKey] || 0) + contract.quantity;
+            }
+        }
+    });
+
+    const sortedKeys = Object.keys(results).sort();
+    const labels = sortedKeys.map(k => `${k.split('-')[0]}年${parseInt(k.split('-')[1])}月`);
+    const counts = sortedKeys.map(k => results[k].count);
+    const rentRevenues = sortedKeys.map(k => results[k].rentRevenue.toFixed(2));
+    const managementRevenues = sortedKeys.map(k => results[k].managementRevenue.toFixed(2));
+    const totalRevenues = sortedKeys.map(k => (results[k].rentRevenue + results[k].managementRevenue).toFixed(2));
+    const occupancyRates = sortedKeys.map(k => (results[k].count / projectSize * 100).toFixed(2));
+
+    const expirationLabels = Object.keys(expirationResults).sort();
+    const expirationCounts = expirationLabels.map(k => expirationResults[k]);
+
+    renderChart('occupancyChart', labels, occupancyRates, '出租率 (%)', 'line', { max: 100 });
+    renderChart('leaseChart', expirationLabels.map(k => `${k.split('-')[0]}年${parseInt(k.split('-')[1])}月`), expirationCounts, '到期合同数量', 'bar');
+    renderStackedBarChart('incomeChart', labels, rentRevenues, managementRevenues);
+
+    const tableBody = $('#data-table tbody');
+    tableBody.empty();
+    sortedKeys.forEach((key, index) => {
+        tableBody.append(`<tr>
+            <td>${labels[index]}</td>
+            <td>${occupancyRates[index]}</td>
+            <td>${expirationResults[key] || 0}</td>
+            <td>${rentRevenues[index]}</td>
+            <td>${managementRevenues[index]}</td>
+            <td>${totalRevenues[index]}</td>
+        </tr>`);
+    });
+}
+
+function renderChart(canvasId, labels, data, label, type, options = {}) {
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    if (charts[canvasId]) charts[canvasId].destroy();
+    charts[canvasId] = new Chart(ctx, {
+        type: type,
+        data: {
+            labels: labels,
+            datasets: [{
+                label: label,
+                data: data,
+                borderColor: type === 'line' ? 'rgb(255, 99, 132)' : 'rgb(54, 162, 235)',
+                backgroundColor: type === 'bar' ? 'rgba(54, 162, 235, 0.2)' : undefined,
+                fill: type === 'line'
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: { beginAtZero: true, max: options.max }
+            }
+        }
+    });
+}
+
+function renderStackedBarChart(canvasId, labels, rentRevenues, managementRevenues) {
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    if (charts[canvasId]) charts[canvasId].destroy();
+    charts[canvasId] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: '房租收入',
+                    data: rentRevenues,
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)'
+                },
+                {
+                    label: '管理费收入',
+                    data: managementRevenues,
+                    backgroundColor: 'rgba(255, 99, 132, 0.6)'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: { stacked: true },
+                y: { stacked: true, beginAtZero: true }
+            }
+        }
+    });
 }
 
 function parseDate(dateStr) {
@@ -58,78 +254,56 @@ function parseDate(dateStr) {
     return { year, month };
 }
 
-function calculate() {
+function downloadData() {
+    const projectName = $('#project-name').val();
+    const city = $('#city').val();
+    const projectSize = $('#project-size').val();
     const contracts = [];
     $('.contract-item').each(function() {
         const contract = {
             startDate: $(this).find('.start-date').val(),
-            quantity: parseInt($(this).find('.quantity').val()),
-            term: parseInt($(this).find('.term').val()),
-            rent: parseFloat($(this).find('.rent').val())
+            quantity: $(this).find('.quantity').val(),
+            term: $(this).find('.term').val(),
+            rent: $(this).find('.rent').val(),
+            managementFee: $(this).find('.management-fee').val(),
+            discounts: []
         };
-        if (contract.startDate) contracts.push(contract);
+        $(this).find('.month-discount').each(function() {
+            contract.discounts.push($(this).val());
+        });
+        contracts.push(contract);
     });
 
-    const results = {};
+    const tableData = [];
+    $('#data-table tbody tr').each(function() {
+        const row = [];
+        $(this).find('td').each(function() {
+            row.push($(this).text());
+        });
+        tableData.push(row);
+    });
+
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "项目名称,所在城市,项目体量（间）\n";
+    csvContent += `${projectName},${city},${projectSize}\n\n`;
+    csvContent += "合同信息\n";
+    csvContent += "起租日期,合同数量,租期(月),月租金,月管理费,逐月折扣率\n";
     contracts.forEach(contract => {
-        const start = parseDate(contract.startDate);
-        const endMonth = start.month + contract.term;
-        
-        const expirationYear = start.year + Math.floor((endMonth - 1)/12);
-        const expirationMonth = ((endMonth - 1) % 12) + 1;
-        
-        const key = `${expirationYear}-${String(expirationMonth).padStart(2, '0')}`;
-        results[key] = results[key] || { count: 0, revenue: 0 };
-        results[key].count += contract.quantity;
-        results[key].revenue += contract.quantity * contract.rent;
+        csvContent += `${contract.startDate},${contract.quantity},${contract.term},${contract.rent},${contract.managementFee},"${contract.discounts.join(',')}"\n`;
+    });
+    csvContent += "\n数据表\n";
+    csvContent += "月份,出租率 (%),到期合同数量,房租收入 (元),管理费收入 (元),总收入 (元)\n";
+    tableData.forEach(row => {
+        csvContent += row.join(',') + '\n';
     });
 
-    const sortedKeys = Object.keys(results).sort();
-    const labels = sortedKeys.map(k => `${k.split('-')[0]}年${parseInt(k.split('-')[1])}月`);
-    const counts = sortedKeys.map(k => results[k].count);
-    const revenues = sortedKeys.map(k => results[k].revenue);
-
-    renderChart(labels, counts, revenues);
-}
-
-function renderChart(labels, counts, revenues) {
-    const ctx = document.getElementById('expirationChart').getContext('2d');
-    
-    if (chart) chart.destroy();
-
-    chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: '到期客户数',
-                data: counts,
-                borderColor: 'rgb(255, 99, 132)',
-                yAxisID: 'y'
-            }, {
-                label: '租金收入（元）',
-                data: revenues,
-                borderColor: 'rgb(54, 162, 235)',
-                yAxisID: 'y1'
-            }]
-        },
-        options: {
-            responsive: true,
-            scales: {
-                y: {
-                    type: 'linear',
-                    position: 'left',
-                    title: { display: true, text: '客户数' }
-                },
-                y1: {
-                    type: 'linear',
-                    position: 'right',
-                    title: { display: true, text: '收入（元）' },
-                    grid: { drawOnChartArea: false }
-                }
-            }
-        }
-    });
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "project-data.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 </script>
 </body>
