@@ -5,23 +5,32 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f9f9f9; margin: 0; padding: 0 }
+        body { font-family: Arial, sans-serif; background-color: #f9f9f9f9; margin: 0; padding: 0 }
         .container { max-width: 1200px; margin: 0 auto; padding: 20px }
         .input-section { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) }
         .chart-container { margin-top: 30px }
-        .contract-item { margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; background: #fafafa }
-        .contract-row { display: flex; flex-wrap: wrap; justify-content: flex-start; margin-bottom: 10px; gap: 15px }
-        .contract-row label { width: 120px; margin-right: 3px; text-align: left }
-        .contract-row input, .discount-fields input { width: 120px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; height: 20px }
-        .contract-item button { background: #ff4d4d; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer }
-        .discount-fields { margin-top: 10px; display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 15px }
-        .discount-fields label { width: 100px; text-align: left }
+        .contract-item { margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; background: #fafafa; position: relative }
+        .contract-item .contract-number { position: absolute; top: -20px; left: 10px; font-weight: bold; color: #555; background: #ddd; padding: 5px; margin: 5px; z-index: 1 }
+        .contract-row { display: flex; flex-wrap: wrap; justify-content: flex-start; margin-bottom: 5px; gap: 5px; align-items: center }
+        .contract-row label { width: 100px; margin-right: 3px; text-align: left; display: flex; align-items: center }
+        .contract-row input, .discount-fields input, .discount-fields select { width: 100px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; height: 20px; display: flex; align-items: center }
+        .specific-width { width: 60px; } /* 特定宽度样式 */
+        .discount-fields { display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-start }
+        .discount-fields label { width: auto; margin-right: 5px; flex-shrink: 0 }
+        .contract-item button { background: #ff4d4d; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-top: 10px }
         button { background: #4CAF50; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer }
         .download-btn { background: #007BFF; margin-left: 10px }
         .visitor-count { font-size: 14px; color: #555; margin-top: 10px }
         .data-table { margin-top: 20px; width: 100%; border-collapse: collapse }
         .data-table th, .data-table td { padding: 10px; border: 1px solid #ddd; text-align: center }
         .data-table th { background: #f5f5f5 }
+        
+        /* 仅修改以下三个输入框的宽度 */
+        .xiaohongshu-reduction,
+        .group-reduction,
+        .expansion-reduction {
+            width: 30px; /* 修改为40px */
+        }
     </style>
 </head>
 <body>
@@ -34,7 +43,7 @@
             <div class="contract-row">
                 <label>项目名称:</label><input type="text" id="project-name">
                 <label>所在城市:</label><input type="text" id="city">
-                <label>项目体量（间）:</label><input type="number" id="project-size" min="1">
+                <label>项目体量（间）:</label><input type="number" id="project-size" min="1" required>
             </div>
         </div>
 
@@ -52,7 +61,7 @@
             <canvas id="occupancyChart"></canvas>
             <h2>合同到期月份</h2>
             <canvas id="leaseChart"></canvas>
-            <h2>收入分布示意图</h2>
+            <h2>经营收入分布示意图</h2>
             <canvas id="incomeChart"></canvas>
         </div>
 
@@ -64,9 +73,7 @@
                         <th>月份</th>
                         <th>出租率 (%)</th>
                         <th>到期合同数量</th>
-                        <th>房租收入 (元)</th>
-                        <th>管理费收入 (元)</th>
-                        <th>总收入 (元)</th>
+                        <th>经营收入 (元)</th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -88,14 +95,47 @@ visitorCount++;
 localStorage.setItem('visitorCount', visitorCount);
 document.getElementById('visitor-count').textContent = visitorCount;
 
+let contractCounter = 0;
+
 function addContract() {
+    contractCounter++;
     const newContract = $(`<div class="contract-item">
+        <div class="contract-number">第${contractCounter}批次合同</div>
         <div class="contract-row">
             <label>起租日期:</label><input type="date" class="start-date" value="2025-01-01">
             <label>合同数量:</label><input type="number" class="quantity" min="1" value="100">
             <label>租期(月):</label><input type="number" class="term" min="1" value="12">
             <label>月租金:</label><input type="number" class="rent" min="0" value="3000">
             <label>月管理费:</label><input type="number" class="management-fee" min="0" value="200">
+        </div>
+        <div class="contract-row">
+            <label>小红书减免额:</label><input type="number" class="xiaohongshu-reduction specific-width" min="0" value="1000">
+            <label>小红书减免分配月数:</label><select class="xiaohongshu-months">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+            </select>
+            <label>成团减免额:</label><input type="number" class="group-reduction specific-width" min="0" value="100">
+            <label>成团减免分配月数:</label><select class="group-months">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+            </select>
+            <label>膨胀金减免额:</label><input type="number" class="expansion-reduction specific-width" min="0" value="10">
+            <label>膨胀金减免分配月数:</label><select class="expansion-months">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+            </select>
         </div>
         <div class="discount-fields"></div>
         <button onclick="removeContract(this)">删除</button>
@@ -117,13 +157,18 @@ function updateDiscountFields(input) {
     fields.empty();
     for (let i = 1; i <= term; i++) {
         const label = `<label>第${i}月折扣率:</label>`;
-        const inputField = `<input type="number" class="month-discount" min="0" max="1" step="0.01" value="1">`;
+        const inputField = `<input type="number" class="month-discount" min="0" max="1" step="0.01" value="1" style="margin-top: 5px;">`;
         fields.append(label + inputField);
     }
 }
 
 function calculate() {
-    const projectSize = parseInt($('#project-size').val()) || 1;
+    const projectSize = parseInt($('#project-size').val());
+    if (!projectSize) {
+        alert("项目体量（间）是必填项！");
+        return;
+    }
+
     const contracts = [];
     $('.contract-item').each(function() {
         const contract = {
@@ -132,6 +177,12 @@ function calculate() {
             term: parseInt($(this).find('.term').val()),
             rent: parseFloat($(this).find('.rent').val()),
             managementFee: parseFloat($(this).find('.management-fee').val()),
+            xiaohongshuReduction: parseFloat($(this).find('.xiaohongshu-reduction').val()),
+            xiaohongshuMonths: parseInt($(this).find('.xiaohongshu-months').val()),
+            groupReduction: parseFloat($(this).find('.group-reduction').val()),
+            groupMonths: parseInt($(this).find('.group-months').val()),
+            expansionReduction: parseFloat($(this).find('.expansion-reduction').val()),
+            expansionMonths: parseInt($(this).find('.expansion-months').val()),
             discounts: []
         };
         $(this).find('.month-discount').each(function() {
@@ -148,16 +199,22 @@ function calculate() {
             const month = (start.month + i - 1) % 12 + 1;
             const year = start.year + Math.floor((start.month + i - 1) / 12);
             const key = `${year}-${String(month).padStart(2, '0')}`;
-            results[key] = results[key] || { count: 0, rentRevenue: 0, managementRevenue: 0 };
+            results[key] = results[key] || { count: 0, revenue: 0 };
             results[key].count += contract.quantity;
+
             const discount = contract.discounts[i] || 1;
             const daysInMonth = new Date(year, month, 0).getDate();
             const startDay = (i === 0) ? new Date(contract.startDate).getDate() : 1;
-            const days = daysInMonth - startDay + 1;
-            const rentRevenue = contract.quantity * (contract.rent * (days / daysInMonth) * discount);
+            const endDay = (i === contract.term - 1) ? new Date(year, month, 0).getDate() : daysInMonth;
+            const days = endDay - startDay + 1;
+
+            const rentRevenue = contract.quantity * ((contract.rent * discount) * (days / daysInMonth));
             const managementRevenue = contract.quantity * contract.managementFee;
-            results[key].rentRevenue += rentRevenue;
-            results[key].managementRevenue += managementRevenue;
+            const xiaohongshuReductionPerMonth = (i < contract.xiaohongshuMonths) ? contract.xiaohongshuReduction / contract.xiaohongshuMonths : 0;
+            const groupReductionPerMonth = (i < contract.groupMonths) ? contract.groupReduction / contract.groupMonths : 0;
+            const expansionReductionPerMonth = (i < contract.expansionMonths) ? contract.expansionReduction / contract.expansionMonths : 0;
+
+            results[key].revenue += rentRevenue - xiaohongshuReductionPerMonth - groupReductionPerMonth - expansionReductionPerMonth + managementRevenue;
 
             if (i === contract.term - 1) {
                 const expirationKey = `${year}-${String(month).padStart(2, '0')}`;
@@ -169,9 +226,7 @@ function calculate() {
     const sortedKeys = Object.keys(results).sort();
     const labels = sortedKeys.map(k => `${k.split('-')[0]}年${parseInt(k.split('-')[1])}月`);
     const counts = sortedKeys.map(k => results[k].count);
-    const rentRevenues = sortedKeys.map(k => results[k].rentRevenue.toFixed(2));
-    const managementRevenues = sortedKeys.map(k => results[k].managementRevenue.toFixed(2));
-    const totalRevenues = sortedKeys.map(k => (results[k].rentRevenue + results[k].managementRevenue).toFixed(2));
+    const revenues = sortedKeys.map(k => results[k].revenue.toFixed(2));
     const occupancyRates = sortedKeys.map(k => (results[k].count / projectSize * 100).toFixed(2));
 
     const expirationLabels = Object.keys(expirationResults).sort();
@@ -179,7 +234,7 @@ function calculate() {
 
     renderChart('occupancyChart', labels, occupancyRates, '出租率 (%)', 'line', { max: 100 });
     renderChart('leaseChart', expirationLabels.map(k => `${k.split('-')[0]}年${parseInt(k.split('-')[1])}月`), expirationCounts, '到期合同数量', 'bar');
-    renderStackedBarChart('incomeChart', labels, rentRevenues, managementRevenues);
+    renderChart('incomeChart', labels, revenues, '经营收入 (元)', 'bar');
 
     const tableBody = $('#data-table tbody');
     tableBody.empty();
@@ -188,9 +243,7 @@ function calculate() {
             <td>${labels[index]}</td>
             <td>${occupancyRates[index]}</td>
             <td>${expirationResults[key] || 0}</td>
-            <td>${rentRevenues[index]}</td>
-            <td>${managementRevenues[index]}</td>
-            <td>${totalRevenues[index]}</td>
+            <td>${revenues[index]}</td>
         </tr>`);
     });
 }
@@ -219,36 +272,6 @@ function renderChart(canvasId, labels, data, label, type, options = {}) {
     });
 }
 
-function renderStackedBarChart(canvasId, labels, rentRevenues, managementRevenues) {
-    const ctx = document.getElementById(canvasId).getContext('2d');
-    if (charts[canvasId]) charts[canvasId].destroy();
-    charts[canvasId] = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: '房租收入',
-                    data: rentRevenues,
-                    backgroundColor: 'rgba(54, 162, 235, 0.6)'
-                },
-                {
-                    label: '管理费收入',
-                    data: managementRevenues,
-                    backgroundColor: 'rgba(255, 99, 132, 0.6)'
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            scales: {
-                x: { stacked: true },
-                y: { stacked: true, beginAtZero: true }
-            }
-        }
-    });
-}
-
 function parseDate(dateStr) {
     const [year, month] = dateStr.split('-').map(Number);
     return { year, month };
@@ -266,6 +289,12 @@ function downloadData() {
             term: $(this).find('.term').val(),
             rent: $(this).find('.rent').val(),
             managementFee: $(this).find('.management-fee').val(),
+            xiaohongshuReduction: $(this).find('.xiaohongshu-reduction').val(),
+            xiaohongshuMonths: $(this).find('.xiaohongshu-months').val(),
+            groupReduction: $(this).find('.group-reduction').val(),
+            groupMonths: $(this).find('.group-months').val(),
+            expansionReduction: $(this).find('.expansion-reduction').val(),
+            expansionMonths: $(this).find('.expansion-months').val(),
             discounts: []
         };
         $(this).find('.month-discount').each(function() {
@@ -287,12 +316,12 @@ function downloadData() {
     csvContent += "项目名称,所在城市,项目体量（间）\n";
     csvContent += `${projectName},${city},${projectSize}\n\n`;
     csvContent += "合同信息\n";
-    csvContent += "起租日期,合同数量,租期(月),月租金,月管理费,逐月折扣率\n";
+    csvContent += "起租日期,合同数量,租期(月),月租金,月管理费,小红书减免额,小红书减免分配月数,成团减免额,成团减免分配月数,膨胀金减免额,膨胀金减免分配月数,逐月折扣率\n";
     contracts.forEach(contract => {
-        csvContent += `${contract.startDate},${contract.quantity},${contract.term},${contract.rent},${contract.managementFee},"${contract.discounts.join(',')}"\n`;
+        csvContent += `${contract.startDate},${contract.quantity},${contract.term},${contract.rent},${contract.managementFee},${contract.xiaohongshuReduction},${contract.xiaohongshuMonths},${contract.groupReduction},${contract.groupMonths},${contract.expansionReduction},${contract.expansionMonths},"${contract.discounts.join(',')}"\n`;
     });
     csvContent += "\n数据表\n";
-    csvContent += "月份,出租率 (%),到期合同数量,房租收入 (元),管理费收入 (元),总收入 (元)\n";
+    csvContent += "月份,出租率 (%),到期合同数量,经营收入 (元)\n";
     tableData.forEach(row => {
         csvContent += row.join(',') + '\n';
     });
